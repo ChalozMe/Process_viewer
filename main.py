@@ -9,7 +9,7 @@ ENLACE GIT
 
 copy.py es un ejemplo extraido de CHAT GPT, usarlo como referencia,
 mas evitar copiar o pedir a chat que haga las cosas, esta resultando 
-problematico
+problematicor
 
 Se DEBE tener los ficheros en la misma carpeta:
     cpu.py

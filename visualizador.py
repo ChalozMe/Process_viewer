@@ -110,51 +110,82 @@ class VisualizadorProcesos:
         self.actualizar_tabla()
 
     def asignar_procesos_a_cpus(self):
+        """
+        Asigna procesos a las CPUs de forma circular o según la lógica definida.
+        """
+        if not self.procesos:
+            messagebox.showwarning("Advertencia", "No hay procesos para asignar.")
+            return
+
+        for cpu in self.cpus:
+            cpu.limpiar_procesos()  # Limpiar cualquier asignación previa.
+
         for i, proceso in enumerate(self.procesos):
             cpu = self.cpus[i % len(self.cpus)]  # Asignación circular
             cpu.asignar_proceso(proceso)
+
         messagebox.showinfo("Asignación", "Procesos asignados a las CPUs.")
 
     def configurar_cpus(self):
+        """
+        Abre una ventana para configurar las CPUs. Permite seleccionar el algoritmo
+        y el quantum (si aplica) para cada CPU.
+        """
         ventana_config = tk.Toplevel(self.root)
         ventana_config.title("Configurar CPUs")
-        ventana_config.geometry("400x300")
+        ventana_config.geometry("500x300")
 
+        # Crear widgets para cada CPU
         for cpu in self.cpus:
             frame_cpu = tk.Frame(ventana_config)
-            frame_cpu.pack(pady=10, fill=tk.X)
+            frame_cpu.pack(pady=5, fill=tk.X)
 
             tk.Label(frame_cpu, text=f"CPU {cpu.id}").grid(row=0, column=0, padx=5)
 
-            def set_sjf(cpu_obj=cpu):
-                cpu_obj.algorithm = "SJF"
-                cpu_obj.quantum = None
-                messagebox.showinfo("Configuración", f"CPU {cpu_obj.id} configurada con SJF.")
+            tk.Label(frame_cpu, text="Algoritmo:").grid(row=0, column=1, padx=5)
+            
+            # Reemplazar combobox por botones para simplicidad
+            btn_sjf = tk.Button(frame_cpu, text="SJF", 
+                                command=lambda cpu_obj=cpu: self.configurar_algoritmo(cpu_obj, "SJF", None))
+            btn_sjf.grid(row=0, column=2, padx=5)
 
-            def set_rr(cpu_obj=cpu):
-                def set_quantum():
-                    quantum_window = tk.Toplevel(self.root)
-                    quantum_window.title("Configurar Quantum")
-                    tk.Label(quantum_window, text="Quantum:").pack(pady=5)
-                    quantum_entry = tk.Entry(quantum_window)
-                    quantum_entry.pack(pady=5)
+            btn_rr = tk.Button(frame_cpu, text="Round Robin", 
+                            command=lambda cpu_obj=cpu: self.abrir_config_rr(cpu_obj))
+            btn_rr.grid(row=0, column=3, padx=5)
 
-                    def save_quantum():
-                        try:
-                            quantum = float(quantum_entry.get())
-                            cpu_obj.algorithm = "Round Robin"
-                            cpu_obj.quantum = quantum
-                            messagebox.showinfo("Configuración", f"CPU {cpu_obj.id} configurada con Round Robin y quantum {quantum}.")
-                            quantum_window.destroy()
-                        except ValueError:
-                            messagebox.showerror("Error", "Quantum debe ser un número válido.")
+        
+        tk.Button(ventana_config, text="Cerrar", command=ventana_config.destroy).pack(pady=10)
 
-                    tk.Button(quantum_window, text="Guardar", command=save_quantum).pack(pady=10)
+    def configurar_algoritmo(self, cpu, algoritmo, quantum):
+        """
+        Configura el algoritmo de la CPU con el nombre del algoritmo y el quantum (si aplica).
+        """
+        cpu.algorithm = algoritmo
+        cpu.quantum = quantum
+        cpu.ejecutar_algoritmo()
+        messagebox.showinfo("Configuración", f"CPU {cpu.id} configurada con {algoritmo}.")
 
-                set_quantum()
+    def abrir_config_rr(self, cpu):
+        """
+        Abre una ventana adicional para configurar el quantum en el caso de Round Robin.
+        """
+        ventana_rr = tk.Toplevel(self.root)
+        ventana_rr.title(f"Configurar Quantum - CPU {cpu.id}")
+        ventana_rr.geometry("300x150")
 
-            tk.Button(frame_cpu, text="SJF", command=set_sjf).grid(row=0, column=1, padx=5)
-            tk.Button(frame_cpu, text="Round Robin", command=set_rr).grid(row=0, column=2, padx=5)
+        tk.Label(ventana_rr, text=f"Configurar Quantum para CPU {cpu.id}:").pack(pady=10)
+        entry_quantum = tk.Entry(ventana_rr)
+        entry_quantum.pack(pady=5)
+
+        def guardar_rr():
+            try:
+                quantum = float(entry_quantum.get())
+                self.configurar_algoritmo(cpu, "Round Robin", quantum)
+                ventana_rr.destroy()
+            except ValueError:
+                messagebox.showerror("Error", "El quantum debe ser un número válido.")
+
+        tk.Button(ventana_rr, text="Guardar", command=guardar_rr).pack(pady=10)
 
     def actualizar_tabla(self):
         for item in self.tree.get_children():
@@ -182,54 +213,25 @@ class VisualizadorProcesos:
         thread.start()
 
     def simular_planificacion(self, canvas):
-        
+        """
+        Representa gráficamente la planificación de los procesos asignados a las CPUs.
+        """
         x_start = 50
         y_base = 100
-        escala = 5  # Escala para bloquecito
-        
-        canvas.delete("all")
+        escala = 10  # Escala para ajustar el tamaño de los rectángulos
 
         for cpu in self.cpus:
-            y_position = y_base + (cpu.id - 1) * 60  # cada CPU
-            canvas.create_text(50, y_position - 20, text=f"CPU {cpu.id}", font=("Arial", 12), anchor="w")
+            procesos = cpu.get_cola_procesos()  # Devuelve objetos Proceso directamente
 
-            tiempo_actual = 0  # Tiempo relativo para cada CPU
-            procesos_ordenados = []
+            # Dibujar una línea base para cada CPU
+            canvas.create_text(x_start, y_base + 50, text=f"CPU {cpu.id}", anchor="w", fill="black")
+            canvas.create_line(x_start, y_base + 10, x_start + 700, y_base + 10, fill="gray")
 
-            if cpu.algorithm == "SJF":
-                procesos_ordenados = sorted(cpu.procesos, key=lambda p: p.cpu_time)
-            elif cpu.algorithm == "Round Robin":
-                quantum = cpu.quantum or 1  # DEJAR EL 1 X DEFAUT, SINO NO CORRE
-                procesos_ordenados = self.round_robin_simulation(cpu.procesos, quantum)
+            x_pos = x_start + 1
+            for proceso in procesos:
+                rect_width = proceso.cpu_time * escala
+                canvas.create_rectangle(x_pos, y_base, x_pos + rect_width, y_base + 20, fill="blue", outline="black")
+                canvas.create_text(x_pos + rect_width / 2, y_base + 10, text=f"P{proceso.pid}", anchor="center", fill="white")
+                x_pos += rect_width + 5
 
-            for proceso in procesos_ordenados: #Draw
-                barra = canvas.create_rectangle(
-                    x_start + tiempo_actual * escala, y_position,
-                    x_start + (tiempo_actual + proceso.cpu_time) * escala,
-                    y_position + 20, fill="purple"
-                )
-                # Dibujar el identificador del proceso
-                canvas.create_text(
-                    x_start + (tiempo_actual + proceso.cpu_time / 2) * escala,
-                    y_position + 10, text=f"P{proceso.pid}", font=("Arial", 10), fill="white"
-                )
-                # Dibujar indicador del tiempo actual
-                canvas.create_text(
-                    x_start + tiempo_actual * escala, y_position + 30,
-                    text=str(int(tiempo_actual)), font=("Arial", 8)
-                )
-                # TIEMPO
-                tiempo_actual += proceso.cpu_time
-
-            # colocar en la linea de tiempo el segundo en el que comienza el proceso
-            canvas.create_text(
-                x_start + tiempo_actual * escala, y_position + 30,
-                text=str(int(tiempo_actual)), font=("Arial", 8)
-            )
-
-        # Test "print"
-        canvas.create_text(
-            400, y_base + len(self.cpus) * 60 + 20,
-            text="Simulación completa :D", font=("Arial", 14), fill="magenta"
-        )
-
+            y_base += 100
