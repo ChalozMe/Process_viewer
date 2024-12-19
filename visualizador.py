@@ -13,8 +13,10 @@ class VisualizadorProcesos:
     def __init__(self, root):
         self.root = root
         self.root.title("Visualizador de Procesos")
-        self.root.geometry("800x600")
+        self.root.geometry("1200x800")
 
+        self.root.configure(bg="lightblue")
+        
         # Lista de procesos y 4 CPUs estáticas
         self.procesos = []
         self.cpus = [CPU(id=i + 1) for i in range(4)]  # Crear 4 CPUs
@@ -30,7 +32,7 @@ class VisualizadorProcesos:
         self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Botones
-        btn_frame = tk.Frame(root)
+        btn_frame = tk.Frame(root, bg="cyan")
         btn_frame.pack(pady=10)
 
         btn_agregar = tk.Button(btn_frame, text="Agregar Proceso", command=self.agregar_proceso)
@@ -110,9 +112,6 @@ class VisualizadorProcesos:
         self.actualizar_tabla()
 
     def asignar_procesos_a_cpus(self):
-        """
-        Asigna procesos a las CPUs de forma circular o según la lógica definida.
-        """
         if not self.procesos:
             messagebox.showwarning("Advertencia", "No hay procesos para asignar.")
             return
@@ -127,10 +126,6 @@ class VisualizadorProcesos:
         messagebox.showinfo("Asignación", "Procesos asignados a las CPUs.")
 
     def configurar_cpus(self):
-        """
-        Abre una ventana para configurar las CPUs. Permite seleccionar el algoritmo
-        y el quantum (si aplica) para cada CPU.
-        """
         ventana_config = tk.Toplevel(self.root)
         ventana_config.title("Configurar CPUs")
         ventana_config.geometry("500x300")
@@ -145,6 +140,10 @@ class VisualizadorProcesos:
             tk.Label(frame_cpu, text="Algoritmo:").grid(row=0, column=1, padx=5)
             
             # Reemplazar combobox por botones para simplicidad
+            btn_fcfs = tk.Button(frame_cpu, text="FCFS", 
+                                command=lambda cpu_obj=cpu: self.configurar_algoritmo(cpu_obj, "FCFS", None))
+            btn_fcfs.grid(row=0, column=4, padx=5)
+
             btn_sjf = tk.Button(frame_cpu, text="SJF", 
                                 command=lambda cpu_obj=cpu: self.configurar_algoritmo(cpu_obj, "SJF", None))
             btn_sjf.grid(row=0, column=2, padx=5)
@@ -157,18 +156,12 @@ class VisualizadorProcesos:
         tk.Button(ventana_config, text="Cerrar", command=ventana_config.destroy).pack(pady=10)
 
     def configurar_algoritmo(self, cpu, algoritmo, quantum):
-        """
-        Configura el algoritmo de la CPU con el nombre del algoritmo y el quantum (si aplica).
-        """
         cpu.algorithm = algoritmo
         cpu.quantum = quantum
         cpu.ejecutar_algoritmo()
         messagebox.showinfo("Configuración", f"CPU {cpu.id} configurada con {algoritmo}.")
 
     def abrir_config_rr(self, cpu):
-        """
-        Abre una ventana adicional para configurar el quantum en el caso de Round Robin.
-        """
         ventana_rr = tk.Toplevel(self.root)
         ventana_rr.title(f"Configurar Quantum - CPU {cpu.id}")
         ventana_rr.geometry("300x150")
@@ -203,9 +196,9 @@ class VisualizadorProcesos:
 
         ventana_simulacion = tk.Toplevel(self.root)
         ventana_simulacion.title("Simulación de Planificación")
-        ventana_simulacion.geometry("800x400")
+        ventana_simulacion.geometry("1200x800")
 
-        canvas = tk.Canvas(ventana_simulacion, bg="white")
+        canvas = tk.Canvas(ventana_simulacion, bg="lightblue")
         canvas.pack(fill=tk.BOTH, expand=True)
 
         # Simular la ejecución en un hilo separado
@@ -213,15 +206,13 @@ class VisualizadorProcesos:
         thread.start()
 
     def simular_planificacion(self, canvas):
-        """
-        Representa gráficamente la planificación de los procesos asignados a las CPUs.
-        """
+        size_add = 5
         x_start = 50
         y_base = 100
-        escala = 10  # Escala para ajustar el tamaño de los rectángulos
+        escala = 10  # Escala
 
         for cpu in self.cpus:
-            procesos = cpu.get_cola_procesos()  # Devuelve objetos Proceso directamente
+            procesos = cpu.get_cola_procesos() 
 
             # Dibujar una línea base para cada CPU
             canvas.create_text(x_start, y_base + 50, text=f"CPU {cpu.id}", anchor="w", fill="black")
@@ -230,8 +221,12 @@ class VisualizadorProcesos:
             x_pos = x_start + 1
             for proceso in procesos:
                 rect_width = proceso.cpu_time * escala
-                canvas.create_rectangle(x_pos, y_base, x_pos + rect_width, y_base + 20, fill="blue", outline="black")
-                canvas.create_text(x_pos + rect_width / 2, y_base + 10, text=f"P{proceso.pid}", anchor="center", fill="white")
-                x_pos += rect_width + 5
+                if(rect_width < 1):
+                    canvas.create_rectangle(x_pos, y_base, x_pos + rect_width + size_add, y_base + 20, fill="yellow", outline="black")
+                    canvas.create_text(x_pos + (rect_width+size_add) / 2, y_base + 10, text=f"P{proceso.pid}", anchor="center", fill="black")
+                else:
+                    canvas.create_rectangle(x_pos, y_base, x_pos + rect_width + size_add, y_base + 20, fill="blue", outline="black")
+                    canvas.create_text(x_pos + (rect_width+size_add) / 2, y_base + 10, text=f"P{proceso.pid}", anchor="center", fill="white")
+                x_pos += rect_width + size_add + 5
 
             y_base += 100
