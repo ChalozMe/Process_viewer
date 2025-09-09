@@ -206,10 +206,10 @@ class VisualizadorProcesos:
         thread.start()
 
     def simular_planificacion(self, canvas):
-        size_add = 5
+        size_add = 1
         x_start = 50
         y_base = 100
-        escala = 10  # Escala
+        escala = 2  # Escala
 
         for cpu in self.cpus:
             procesos = cpu.get_cola_procesos() 
